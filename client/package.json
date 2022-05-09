@@ -27,6 +27,8 @@
     "sirv-cli": "1.0.3"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^1.35.3",
+    "dotenv": "^16.0.0",
     "grid-engine": "^2.15.0",
     "phaser": "^3.55.2",
     "preact": "^10.3.2",
