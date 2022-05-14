@@ -4,49 +4,85 @@ import { h} from 'preact';
 import {useState} from 'preact/hooks'
 import { Link } from 'preact-router/match';
 import { route } from 'preact-router';
+import { supabase  }from "../../utils/ConnectDB";
 
 const Home = () => {
+	const [joinGame, setJoinGame] = useState(false);
+	const [loading, setLoading] = useState(false);
 
-	// const name = "mitej";
-	// const walkingAnimationMapping = 6;
 	const [name , setName] = useState("");
-	const [npc , setNpc] = useState("0");
 
-	const handleSubmit = (e) => {
+	const [roomId , setRoomId] = useState("");
+	const [roomPass, setRoomPass] = useState("");
+	
+	const handleSubmit = async(e) => {
 		e.preventDefault();
 
+		setLoading(true);
 
-		if(name === ""){
-			alert("Please enter a name");
-			return;
-		} 
-		
-		localStorage.setItem("params", JSON.stringify({name, npc}));
+		// pass email id -> user.email
 
-		route(`/game`);
+		// Create room
+		// -- check if room exists
+
+		const {data: roomData, error: roomError} = await supabase.from('rooms').select('*').eq('room_id', roomId);
+
+		if(joinGame){
+			route('/game?room=' + roomId + "-" + roomPass);
+		} else{
+			if(roomData.length > 0){
+				setLoading(false);
+				return alert("Room already exists, please enter another room id");
+			}else{
+				const {data: createdRoom, error: createdRoomError} = await supabase.from('rooms').insert({
+						room_id: roomId,
+						room_password: roomPass,
+					});
+				
+				if(createdRoomError){
+					return alert("Error creating room");
+				}	
+	
+				setLoading(false);
+	
+				route("/game?room=" + roomId + "-" + roomPass);
+	
+			}
+		}
+
 	}
-
-
 	return (
 		<div class={style.home}>
 			<h1>Start Game</h1>
 			<form onSubmit={handleSubmit}>
-				<p>Name: </p>
-				<input type="text" value={name} onChange={(e) => setName(e.target.value)}/>
-				<p>Walking Animation Mapping: </p>
-				<select name="character" value={npc} onChange={(e) => setNpc(e.target.value)}>
-				  <option value="0">Dr. Strange</option>
-				  <option value="1">Girl</option>
-				  <option value="2">Psysic Girl</option>
-				  <option value="3">Forest Girl</option>
-				  <option value="4">Ash</option>
-				  <option value="5">Sandman</option>
-				  <option value="6">Fire Boy</option>
-				  <option value="7">Water Girl</option>
-				</select>
-				<br />
-				<br />
-				<button type="submit">Submit</button>
+				{
+					joinGame === false ? (
+						<>
+							<h3>Create a room</h3>
+							<p>Room Id</p>
+							<input type="text" value={roomId} onChange={(e) => setRoomId(e.target.value)}/>
+							<p>Room Password</p>
+							<input type="text" value={roomPass} onChange={(e) => setRoomPass(e.target.value)}/>
+							<p>Join a game? <span style="text-decoration:underline" onClick={() => setJoinGame(true)}>click</span></p>
+						</>
+					): (
+						<>
+						<h3>Join a room</h3>
+							<p>Room ID</p>
+							<input type="text" value={roomId} onChange={(e) => setRoomId(e.target.value)}/>
+							<p>Room Password</p>
+							<input type="text" value={roomPass} onChange={(e) => setRoomPass(e.target.value)}/>
+							<p>Want to create a new game? <span style="text-decoration:underline" onClick={() => setJoinGame(false)}>click</span></p>
+						</>
+						
+					)
+				}
+				<button type="submit">{
+					loading ? "Loading..." : (
+						joinGame === false ? "Create Game" : "Join Game"
+					)
+					
+				}</button>
 			</form>
 			
 			

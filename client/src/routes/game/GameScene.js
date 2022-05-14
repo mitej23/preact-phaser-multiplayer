@@ -1,19 +1,14 @@
 import Phaser from "phaser";
 import { io } from "socket.io-client";
 
-function getRandomInt(min, max) {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
 class GameScene extends Phaser.Scene {
 
   constructor(){
     super("Game");
   }  
 
-  playerId; oldPosition; oldDirection;
+  // playerId; oldPosition; oldDirection;
+  id;name;roomId;
 
   // new player
   gridEngineConfig; cloudCityTilemap; 
@@ -49,10 +44,11 @@ class GameScene extends Phaser.Scene {
   create() {
   
     var self = this;
+    this.name = this.game.name;
 
     // connect to ws
     self.socket = io.connect("http://localhost:3000/",{
-      query: "playerName="+this.game.charName+"&char="+this.game.char, 
+      query: "id=" + self.game.id + "&name=" + self.game.name + "&roomId=" + self.game.room_id + "&refresh=" + self.game.refresh,
       withCredentials: true,
       extraHeaders: {
         "my-custom-header": "my-custom-header-value",
@@ -74,146 +70,108 @@ class GameScene extends Phaser.Scene {
       Object.keys(players).forEach(function (id) {
         let playerSprite = self.add.sprite(0, 0, "player");
         playerSprite.scale = 3;
-        playerSprite.id = players[id].playerId;
+        playerSprite.id = players[id].socket_id;
   
         self.gridEngine.addCharacter({
-          id: players[id].playerId,
+          id: players[id].name,
           sprite: playerSprite,
-          walkingAnimationMapping: players[id].walkingAnimationMapping,
+          walkingAnimationMapping: players[id].sprite,
           startPosition: { x: players[id].x, y: players[id].y },
-          facingDirection: players[id].facingDirection,
+          facingDirection: players[id].facing_direction,
         });
   
-        if (players[id].playerId === self.socket.id) {
+        if (players[id].name === self.name) {
           self.cameras.main.startFollow(playerSprite, true);
           self.cameras.main.setFollowOffset(-playerSprite.width, -playerSprite.height);
-          self.playerId = players[id].playerId;
+          self.id = players[id].id;
+          self.name = players[id].name;
+          self.roomId = players[id].room_id;
+          // localStorage.setItem("roomId", self.roomId);
           // console.log(players[id].playerId)
         }
       });
+      console.log(self.gridEngine);
     });
   
     this.socket.on('newPlayer', function (playerInfo) {
-      console.log("new Player")
+      console.log("new Player to be added : ",playerInfo)
+      console.log(self.gridEngineConfig)
       let playerSprite = self.add.sprite(0, 0, "player");
       playerSprite.scale = 3;
       playerSprite.id = playerInfo.playerId;
   
       self.gridEngine.addCharacter({
-        id: playerInfo.playerId,
+        id: playerInfo.name,
         sprite: playerSprite,
-        walkingAnimationMapping: playerInfo.walkingAnimationMapping,
+        walkingAnimationMapping: playerInfo.sprite,
         startPosition: { x: playerInfo.x, y: playerInfo.y },
-        facingDirection: playerInfo.facingDirection,
+        facingDirection: playerInfo.facing_direction,
       });
+      // console.log(self.gridEngine);
     });
   
     this.socket.on('removePlayer', function(playerId){
-      console.log("remove Player")
+      console.log("remove Player",playerId)
       self.gridEngine.getSprite(playerId).destroy();
       self.gridEngine.removeCharacter(playerId);
     });
   
     this.socket.on('playerMovement', function (playerInfo) {
       console.log("playerMovement")
-      self.gridEngine.moveTo(playerInfo.playerId, { x: playerInfo.x, y: playerInfo.y });
-      self.gridEngine.turnTowards(playerInfo.playerId, playerInfo.facingDirection);
+      console.log(playerInfo)
+      console.log(self.gridEngine);
+      
+      if(playerInfo.x !== self.gridEngine.getPosition(playerInfo.name).x || playerInfo.y !== self.gridEngine.getPosition(playerInfo.name).y){
+        self.gridEngine.moveTo(playerInfo.name, { x: playerInfo.x, y: playerInfo.y });
+      }else{
+        self.gridEngine.turnTowards(playerInfo.name, playerInfo.facingDirection);
+      } 
     });
   
     this.gridEngineConfig = {
-      characters : [
-        
-      ]
+      characters : [ ]
     };   
   
-    // for(let i = 12; i < 15; i++) {
-    //   const spr = this.add.sprite(0,0,"player");
-    //   spr.scale = 3;
-    //   this.gridEngineConfig.characters.push({
-    //     id: "enemy" + i,
-    //     sprite: spr,
-    //     walkingAnimationMapping: i - 12,
-    //     startPosition:{x: i,y: i},
-    //   });
-    // }
+
       
     this.gridEngine.create(this.cloudCityTilemap, this.gridEngineConfig);
   
-    // for(let i = 12; i < 15; i++) {
-    //   this.gridEngine.moveRandomly("enemy" + i , getRandomInt(0,1500));
-    // }
-  
-  
-  
-    // check if player is in front of door then teleport
-    // this.gridEngine.positionChangeStarted()
-    //                .subscribe(({charId,enterTile}) => {                  
-    //                   if(enterTile.x === 13 && enterTile.y === 6){
-    //                     this.cameras.main.fadeOut(300);
-    //                     this.time.delayedCall(300,()=>{
-    //                       this.scene.restart({
-    //                         map: "mini-map",
-    //                         charPosition: {x:14,y:15},
-    //                       })
-    //                       this.cameras.main.fadeIn(300);
-    //                     });
-    //                   }
-    //                })
-  
+
   
     // EXPOSE TO EXTENSION
     window.__GRID_ENGINE__ = this.gridEngine;
   }
   
   update() {
-    const cursors = this.input.keyboard.createCursorKeys();
+    if(this.id && this.name && this.roomId){
+      const cursors = this.input.keyboard.createCursorKeys();
     if (cursors.left.isDown) {
-      this.gridEngine.move(this.playerId, "left");
+      this.gridEngine.move(this.name, "left");
     } else if (cursors.right.isDown) {
-      this.gridEngine.move(this.playerId, "right");
+      this.gridEngine.move(this.name, "right");
     } else if (cursors.up.isDown) {
-      this.gridEngine.move(this.playerId, "up");
+      this.gridEngine.move(this.name, "up");
     } else if (cursors.down.isDown) {
-      this.gridEngine.move(this.playerId, "down");
+      this.gridEngine.move(this.name, "down");
     } else if(cursors.space.isDown && cursors.space.shiftKey) {
-      // if(!newPlayer){
-  
-        // const newPlayerSprite = this.add.sprite(0, 0, "player");
-        // newPlayerSprite.scale = 3;
-      //   this.gridEngine.addCharacter({
-      //     id: "newPlayer",
-      //     sprite: newPlayerSprite,
-      //     walkingAnimationMapping: 7,
-      //     startPosition: { x: 3, y: 3 },
-      //   });
-  
-      //   newPlayer = true;
-      
-  
-        
-      //   this.gridEngine.moveRandomly("newPlayer" , getRandomInt(0,1500));
-        
-        
-      //   newPlayer = true;
-      // }
-    }
-  
-    // if(this.gridEngine.isMoving(playerId)){
-    //   console.log("moving")
-    // }
-  
-    if(this.playerId !== undefined){
-      if(this.oldDirection !== this.gridEngine.getFacingDirection(this.playerId) || this.oldPosition.x !== this.gridEngine.getPosition(this.playerId).x || this.oldPosition.y !== this.gridEngine.getPosition(this.playerId).y){
+      console.log(this.roomId)
+    }  
+    if(this.name !== undefined){
+      if(this.oldDirection !== this.gridEngine.getFacingDirection(this.name) || this.oldPosition.x !== this.gridEngine.getPosition(this.name).x || this.oldPosition.y !== this.gridEngine.getPosition(this.name).y){
         this.socket.emit('playerMovement', {
-          playerId: this.playerId,
-          x: this.gridEngine.getPosition(this.playerId).x,
-          y: this.gridEngine.getPosition(this.playerId).y,
-          facingDirection: this.gridEngine.getFacingDirection(this.playerId),
+          id: this.id,
+          name: this.name,
+          x: this.gridEngine.getPosition(this.name).x,
+          y: this.gridEngine.getPosition(this.name).y,
+          roomId: this.roomId,
+          facingDirection: this.gridEngine.getFacingDirection(this.name),
         });
-        this.oldDirection = this.gridEngine.getFacingDirection(this.playerId);
-        this.oldPosition = this.gridEngine.getPosition(this.playerId); 
+        this.oldDirection = this.gridEngine.getFacingDirection(this.name);
+        this.oldPosition = this.gridEngine.getPosition(this.name); 
       }
     }
+    }
+    
     
   }
   

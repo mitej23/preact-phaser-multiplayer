@@ -31,14 +31,13 @@ const PrivateRoute = ({ Component, ...children }) => {
 const App = () => {
 	return (
 		<div id="app">
-			<Header />
 			<AuthProvider>
 				<Router>
-					<PrivateRoute exact path="/" Component={Home}/>
-					<Signup path="/signup/" />
-					<Login path="/login/" />
-					<PrivateRoute path="/game/:remaining_path*" Component={Game}/>
-					<PrivateRoute path="/profile/" user="me" Component={Profile}/>
+					<Home exact path="/" />
+					{/* <Signup path="/signup/" />
+					<Login path="/login/" /> */}
+					<Game path="/game/:remaining_path*" />
+					<Profile path="/profile/" user="me" />
 				</Router>
 			</AuthProvider>
 		</div>
